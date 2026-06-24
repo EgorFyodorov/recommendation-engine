@@ -1,4 +1,5 @@
 import argparse
+import json
 
 import grpc
 
@@ -26,9 +27,8 @@ def main() -> None:
         stub = recommender_pb2_grpc.RecommenderStub(channel)
         response = stub.Recommend(recommender_pb2.RecommendRequest(item_ids=item_ids))
 
-    print(",".join(str(item_id) for item_id in response.item_ids))
+    print(json.dumps({"item_ids": list(response.item_ids)}))
 
 
 if __name__ == "__main__":
     main()
-
