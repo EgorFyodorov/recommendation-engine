@@ -1,0 +1,83 @@
+---
+- name: Deploy recommendation-engine service
+  hosts: recommendation_engine
+  become: true
+  vars:
+    app_dir: /opt/recommendation-engine
+    image: ghcr.io/OWNER/recommendation-engine:latest
+    grpc_port: "50051"
+    metrics_port: "8000"
+    registry_username: ""
+    registry_password: ""
+
+  tasks:
+    - name: Ensure Docker packages are installed
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker service is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Ensure application directory exists
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Log in to container registry
+      ansible.builtin.shell:
+        cmd: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" \
+            --username "$REGISTRY_USERNAME" \
+            --password-stdin
+        executable: /bin/bash
+      when: registry_username | length > 0 and registry_password | length > 0
+      environment:
+        REGISTRY_URL: "{{ image.split('/')[0] }}"
+        REGISTRY_USERNAME: "{{ registry_username }}"
+        REGISTRY_PASSWORD: "{{ registry_password }}"
+      no_log: true
+
+    - name: Render Docker Compose file
+      ansible.builtin.copy:
+        dest: "{{ app_dir }}/docker-compose.yml"
+        mode: "0644"
+        content: |
+          services:
+            recommendation-engine:
+              image: {{ image }}
+              restart: unless-stopped
+              environment:
+                MODEL_PATH: /app/models/recommendation-engine.onnx
+                GRPC_PORT: "{{ grpc_port }}"
+                METRICS_PORT: "{{ metrics_port }}"
+              ports:
+                - "{{ grpc_port }}:{{ grpc_port }}"
+                - "{{ metrics_port }}:{{ metrics_port }}"
+
+    - name: Pull updated image
+      ansible.builtin.command:
+        cmd: docker compose pull
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Start updated service
+      ansible.builtin.command:
+        cmd: docker compose up -d --remove-orphans
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Show service status
+      ansible.builtin.command:
+        cmd: docker compose ps
+        chdir: "{{ app_dir }}"
+      changed_when: false

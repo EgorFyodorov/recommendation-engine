@@ -1,0 +1,10 @@
+services:
+  recommendation-engine:
+    build: .
+    environment:
+      MODEL_PATH: /app/models/recommendation-engine.onnx
+      GRPC_PORT: "50051"
+      METRICS_PORT: "8000"
+    ports:
+      - "50051:50051"
+      - "8000:8000"

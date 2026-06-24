@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "recommendation-engine"
+version = "0.1.0"
+description = "gRPC recommendation service backed by an ONNX model."
+readme = "README.md"
+requires-python = "==3.10.*"
+dependencies = [
+    "grpcio>=1.70",
+    "numpy>=1.24",
+    "onnxruntime>=1.17,<1.24",
+    "prometheus-client>=0.20",
+]
+
+[project.optional-dependencies]
+modeling = [
+    "onnx>=1.16",
+    "onnxscript>=0.5",
+    "torch>=2.2",
+]
+dev = [
+    "grpcio-tools>=1.70",
+    "pytest>=8",
+    "ruff>=0.5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["recommendation_engine", "modeling", "proto"]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["*.ipynb", "proto/*_pb2.py", "proto/*_pb2_grpc.py"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "UP"]
