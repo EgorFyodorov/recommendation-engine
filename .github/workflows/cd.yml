@@ -72,7 +72,7 @@ jobs:
         run: |
           cat > /tmp/inventory.ini <<EOF
           [recommendation_engine]
-          ${DEPLOY_HOST} ansible_user=${DEPLOY_USER} ansible_port=${DEPLOY_PORT:-22}
+          ${DEPLOY_HOST} ansible_user=${DEPLOY_USER} ansible_port=${DEPLOY_PORT:-22} ansible_python_interpreter=/usr/bin/python3
           EOF
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}

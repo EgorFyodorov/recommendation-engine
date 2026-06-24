@@ -150,8 +150,9 @@ deploy/ansible/deploy.yml
 deploy/ansible/inventory.example.ini
 ```
 
-Playbook ожидает Docker-compatible сервер, создает директорию приложения,
-рендерит `docker-compose.yml`, делает `docker compose pull` и запускает сервис.
+Playbook ожидает сервер с уже установленными Docker и Docker Compose plugin.
+Он проверяет их наличие, создает директорию приложения, рендерит
+`docker-compose.yml`, делает `docker compose pull` и запускает сервис.
 
 Минимальный ручной запуск:
 
