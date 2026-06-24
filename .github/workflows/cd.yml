@@ -1,0 +1,99 @@
+name: CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.image }}:${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Prepare image name
+        id: image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/recommendation-engine"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image }}:${{ github.sha }}
+            ${{ steps.image.outputs.image }}:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust deploy host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+
+      - name: Render Ansible inventory
+        run: |
+          cat > /tmp/inventory.ini <<EOF
+          [recommendation_engine]
+          ${DEPLOY_HOST} ansible_user=${DEPLOY_USER} ansible_port=${DEPLOY_PORT:-22}
+          EOF
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+
+      - name: Run Ansible deployment
+        run: |
+          uvx --from ansible-core ansible-playbook \
+            -i /tmp/inventory.ini \
+            deploy/ansible/deploy.yml \
+            -e "image=${IMAGE}" \
+            -e "app_dir=${APP_DIR:-/opt/recommendation-engine}" \
+            -e "grpc_port=${GRPC_PORT:-50051}" \
+            -e "metrics_port=${METRICS_PORT:-8000}" \
+            -e "registry_username=${REGISTRY_USERNAME}" \
+            -e "registry_password=${REGISTRY_PASSWORD}"
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          APP_DIR: ${{ vars.DEPLOY_APP_DIR }}
+          GRPC_PORT: ${{ vars.GRPC_PORT }}
+          METRICS_PORT: ${{ vars.METRICS_PORT }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
