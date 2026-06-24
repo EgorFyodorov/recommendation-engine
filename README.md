@@ -65,9 +65,9 @@ curl http://185.141.227.197:8000/metrics
 
 ## Модель и ONNX
 
-PyTorch-класс из ноутбука является source of truth для модели. ONNX-файл —
-generated artifact. Runtime-сервис не использует PyTorch и загружает только
-ONNX-модель через ONNX Runtime.
+PyTorch-модель описана в `modeling/model.py` и является source of truth для
+экспорта. ONNX-файл — generated artifact. Runtime-сервис не использует PyTorch
+и загружает только ONNX-модель через ONNX Runtime.
 
 Экспорт и проверка:
 
